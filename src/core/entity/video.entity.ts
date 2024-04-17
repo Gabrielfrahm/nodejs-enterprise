@@ -53,7 +53,7 @@ export class VideoEntity extends BaseEntity {
     return MAX_FILE_SIZE;
   }
 
-  serialize(): Record<string, unknown> {
+  serialize() {
     return {
       id: this.id,
       url: this.url,

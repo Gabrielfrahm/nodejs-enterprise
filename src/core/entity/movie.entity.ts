@@ -47,4 +47,16 @@ export class MovieEntity extends BaseEntity {
       updatedAt: this.updatedAt,
     };
   }
+
+  getVideo(): VideoEntity {
+    return this.video;
+  }
+
+  getThumbnail(): ThumbnailEntity | undefined {
+    return this.thumbnail;
+  }
+
+  addThumbnail(thumbnail: ThumbnailEntity) {
+    this.thumbnail = thumbnail;
+  }
 }

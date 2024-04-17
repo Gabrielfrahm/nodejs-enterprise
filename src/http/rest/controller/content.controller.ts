@@ -2,31 +2,25 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Get,
-  Header,
   HttpCode,
   HttpStatus,
-  NotFoundException,
-  Param,
   Post,
   Req,
-  Res,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { randomUUID } from 'crypto';
-import path, { extname } from 'path';
-import type { Request, Response } from 'express';
-import fs from 'fs';
 import { ContentManagementService } from '@src/core/service/content-management.service';
 import { MediaPlayerService } from '@src/core/service/media-player.service';
 import { CreateVideoResponseDto } from '@src/http/rest/dto/response/create-video-response.dto';
 import { RestResponseInterceptor } from '@src/http/rest/interceptor/rest-response.interceptor';
-import { VideoNotFoundException } from '@src/core/exception/video-not-found-exception';
+import { randomUUID } from 'crypto';
+import { Request } from 'express';
 
-@Controller()
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+
+@Controller('content')
 export class ContentController {
   constructor(
     private readonly contentManagementService: ContentManagementService,
@@ -38,14 +32,8 @@ export class ContentController {
   @UseInterceptors(
     FileFieldsInterceptor(
       [
-        {
-          name: 'video',
-          maxCount: 1,
-        },
-        {
-          name: 'thumbnail',
-          maxCount: 1,
-        },
+        { name: 'video', maxCount: 1 },
+        { name: 'thumbnail', maxCount: 1 },
       ],
       {
         dest: './uploads',
@@ -71,8 +59,8 @@ export class ContentController {
         },
       },
     ),
-    new RestResponseInterceptor(CreateVideoResponseDto),
   )
+  @UseInterceptors(new RestResponseInterceptor(CreateVideoResponseDto))
   async uploadVideo(
     @Req() _req: Request,
     @Body()
@@ -91,67 +79,27 @@ export class ContentController {
         'Both video and thumbnail files are required.',
       );
     }
-
-    return this.contentManagementService.createContent({
+    const createdContent = await this.contentManagementService.createContent({
       title: contentData.title,
       description: contentData.description,
-      sizeInKb: videoFile.size,
-      thumbnailUrl: thumbnailFile.path,
       url: videoFile.path,
+      thumbnailUrl: thumbnailFile.path,
+      sizeInKb: videoFile.size,
     });
-  }
 
-  @Get('stream/:videoId')
-  @Header('Content-Type', 'video/mp4')
-  async streamVideo(
-    @Param('videoId') videoId: string,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    try {
-      const url = await this.mediaPlayerService.prepareStreaming(videoId);
+    const video = createdContent.getMedia()?.getVideo();
 
-      if (!url) {
-        throw new NotFoundException(HttpStatus.NOT_FOUND);
-      }
-
-      const videoPath = path.join('.', url);
-      const fileSize = fs.statSync(videoPath).size;
-
-      const range = req.headers.range;
-
-      if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-        const chunkSize = end - start + 1;
-        const file = fs.createReadStream(videoPath, { start, end });
-
-        res.writeHead(HttpStatus.PARTIAL_CONTENT, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize,
-          'Content-Type': 'video/mp4',
-        });
-
-        file.pipe(res);
-      } else {
-        res.writeHead(HttpStatus.OK, {
-          'Content-Length': fileSize,
-          'Content-Type': 'video/mp4',
-        });
-        fs.createReadStream(videoPath).pipe(res);
-      }
-    } catch (error) {
-      if (error instanceof VideoNotFoundException) {
-        return res.status(HttpStatus.NOT_FOUND).send({
-          message: error.message,
-          error: 'Not Found',
-          statusCose: HttpStatus.NOT_FOUND,
-        });
-      }
-      throw error;
+    if (!video) {
+      throw new BadRequestException('Video must be present');
     }
+
+    return {
+      id: createdContent.getId(),
+      title: createdContent.getTitle(),
+      description: createdContent.getDescription(),
+      url: video.getUrl(),
+      createdAt: createdContent.getCreatedAt(),
+      updatedAt: createdContent.getUpdatedAt(),
+    };
   }
 }
