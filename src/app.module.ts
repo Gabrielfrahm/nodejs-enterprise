@@ -7,9 +7,10 @@ import { ContentManagementService } from './core/service/content-management.serv
 import { ContentRepository } from './persistence/repository/content.repository';
 import { VideoRepository } from './persistence/repository/video.repository';
 import { MediaPlayerController } from './http/rest/controller/media-player.controller';
+import { ConfigModule } from './infra/module/config/config.module';
 
 @Module({
-  imports: [],
+  imports: [ConfigModule.forRoot()],
   controllers: [ContentController, MediaPlayerController],
   providers: [
     PrismaService,

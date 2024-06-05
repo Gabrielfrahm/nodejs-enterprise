@@ -4,6 +4,7 @@ import { MovieEntity } from '../entity/movie.entity';
 import { VideoEntity } from '../entity/video.entity';
 import { ThumbnailEntity } from '../entity/thumbnail.entity';
 import { ContentRepository } from '@src/persistence/repository/content.repository';
+import { ConfigService } from '@src/infra/module/config/service/config.service';
 
 export interface CreateContentData {
   title: string;
