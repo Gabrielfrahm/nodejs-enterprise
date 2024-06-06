@@ -21,7 +21,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 
 @Controller('content')
-export class ContentController {
+export class VideoUploadController {
   constructor(
     private readonly contentManagementService: ContentManagementService,
     private readonly mediaPlayerService: MediaPlayerService,
@@ -79,7 +79,24 @@ export class ContentController {
         'Both video and thumbnail files are required.',
       );
     }
-    const createdContent = await this.contentManagementService.createContent({
+
+    const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1 gigabyte
+
+    if (videoFile.size > MAX_FILE_SIZE) {
+      throw new BadRequestException('File size exceeds the limit.');
+    }
+    const MAX_THUMBNAIL_SIZE = 1024 * 1024 * 10; // 10 megabytes
+
+    if (thumbnailFile.size > MAX_THUMBNAIL_SIZE) {
+      throw new BadRequestException('Thumbnail size exceeds the limit.');
+    }
+
+    if (!videoFile || !thumbnailFile) {
+      throw new BadRequestException(
+        'Both video and thumbnail files are required.',
+      );
+    }
+    const createMovie = await this.contentManagementService.createMovie({
       title: contentData.title,
       description: contentData.description,
       url: videoFile.path,
@@ -87,19 +104,16 @@ export class ContentController {
       sizeInKb: videoFile.size,
     });
 
-    const video = createdContent.getMedia()?.getVideo();
-
-    if (!video) {
-      throw new BadRequestException('Video must be present');
-    }
-
     return {
-      id: createdContent.getId(),
-      title: createdContent.getTitle(),
-      description: createdContent.getDescription(),
-      url: video.getUrl(),
-      createdAt: createdContent.getCreatedAt(),
-      updatedAt: createdContent.getUpdatedAt(),
+      id: createMovie.id,
+      title: createMovie.title,
+      description: createMovie.description,
+      url: createMovie.movie.video.url,
+      thumbnailUrl: createMovie.movie.thumbnail.url,
+      sizeInKb: createMovie.movie.video.sizeInKb,
+      duration: createMovie.movie.video.duration,
+      createdAt: createMovie.createdAt,
+      updatedAt: createMovie.updatedAt,
     };
   }
 }
