@@ -6,7 +6,7 @@ import { MovieRepository } from '@src/persistence/repository/movie.repository';
 import { VideoRepository } from '@src/persistence/repository/video.repository';
 import fs from 'fs';
 import request from 'supertest';
-
+import nock from 'nock';
 describe('video upload Controller (e2e)', () => {
   let module: TestingModule;
   let app: INestApplication;
@@ -37,6 +37,7 @@ describe('video upload Controller (e2e)', () => {
     await videoRepository.deleteAll();
     await movieRepository.deleteAll();
     await contentRepository.deleteAll();
+    nock.cleanAll();
   });
 
   afterAll(async () => {
@@ -46,6 +47,46 @@ describe('video upload Controller (e2e)', () => {
 
   describe('/video (POST)', () => {
     it('uploads a video', async () => {
+      nock('https://api.themoviedb.org/3', {
+        encodedQueryParams: true,
+        reqheaders: {
+          Authorization: (): boolean => true,
+        },
+      })
+        .defaultReplyHeaders({ 'access-control-allow-origin': '*' })
+        .get(`/search/keyword`)
+        .query({
+          query: 'Test Video',
+          page: '1',
+        })
+        .reply(200, {
+          results: [
+            {
+              id: '1',
+            },
+          ],
+        });
+
+      nock('https://api.themoviedb.org/3', {
+        encodedQueryParams: true,
+        reqheaders: {
+          Authorization: (): boolean => true,
+        },
+      })
+        .persist()
+        .defaultReplyHeaders({ 'access-control-allow-origin': '*' })
+        .get(`/discover/movie`)
+        .query({
+          with_keywords: '1',
+        })
+        .reply(200, {
+          results: [
+            {
+              vote_average: 8.5,
+            },
+          ],
+        });
+
       const video = {
         title: 'Test Video',
         description: 'This is a test video',
@@ -54,7 +95,6 @@ describe('video upload Controller (e2e)', () => {
         sizeInKb: 1430145,
         duration: 100,
       };
-
       await request(app.getHttpServer())
         .post('/content/video')
         .attach('video', './test/fixtures/sample.mp4')
